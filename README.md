@@ -50,14 +50,6 @@ ratings_small = pd.read_csv(f'{SOURCE_PATH}/ratings_small.csv') # Used for testi
 ratings = pd.read_csv(f'{SOURCE_PATH}/ratings.csv')
 ```
 
-
-```python
-# random.seed(123)
-# ids = random.sample(list(set(ratings['userId'])), 1000)
-# ratings_medium = ratings[ratings['userId'].isin(ids)] 
-# len(ratings_medium)
-```
-
 ### Data Cleaning
 
 From the movies metadata dataset, I will drop some of the columns that will not be useful for this project.
@@ -310,7 +302,7 @@ plt.title("Popular Movies")
 
 
     
-![png](output_12_1.png)
+![png](output_11_1.png)
     
 
 
@@ -348,7 +340,7 @@ plt.show()
 
 
     
-![png](output_14_0.png)
+![png](output_13_0.png)
     
 
 
@@ -589,7 +581,7 @@ plt.title("High Scoring Movies")
 
 
     
-![png](output_17_1.png)
+![png](output_16_1.png)
     
 
 
@@ -605,7 +597,7 @@ plt.show()
 
 
     
-![png](output_18_0.png)
+![png](output_17_0.png)
     
 
 
@@ -1036,13 +1028,13 @@ plt.show()
 
 
     
-![png](output_34_0.png)
+![png](output_33_0.png)
     
 
 
 
     
-![png](output_34_1.png)
+![png](output_33_1.png)
     
 
 
