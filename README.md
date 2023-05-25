@@ -3,7 +3,7 @@
 
 ## Problem Statement
 
-Everyone has encountered this problem before: you sit down to watch a movie, have no idea what to watch or what you think you would like. To solve this, I will create a recommendation system using about 6 million ratings from 270,000 users. The recommendations for each user are created by predicting what the user will rate each movie, and recommending the highest predicted rated movies.
+Everyone has encountered this problem before: you sit down to watch a movie, have no idea what to watch or what you think you would like. To solve this, I will create a recommendation system using 26 million ratings from 270,000 users. The recommendations for each user are created by predicting what the user will rate each movie, and recommending the highest predicted rated movies.
 
 The dataset was found at [The Movies Dataset](https://www.kaggle.com/datasets/rounakbanik/the-movies-dataset) on Kaggle. This dataset consists of more files on the content information about the movies such as cast and crew, but I will focus on the following files for this recommender:
 
