@@ -1,21 +1,9 @@
-```python
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from surprise import Reader, Dataset, SVD
-from surprise.model_selection import cross_validate
-from ast import literal_eval
-from zipfile import ZipFile
-import os
-import random
-```
-
 # Movie Recommendation System
 ### Eva Burns
 
 ## Problem Statement
 
-Everyone has encountered this problem before: you sit down to watch a movie, have no idea what to watch or what you think you would like. To solve this, I will create a recommendation system using about 9.6 million ratings from 100,000 users. The recommendations for each user are created by predicting what the user will rate each movie, and recommending the highest predicted rated movies.
+Everyone has encountered this problem before: you sit down to watch a movie, have no idea what to watch or what you think you would like. To solve this, I will create a recommendation system using about 6 million ratings from 270,000 users. The recommendations for each user are created by predicting what the user will rate each movie, and recommending the highest predicted rated movies.
 
 The dataset was found at [The Movies Dataset](https://www.kaggle.com/datasets/rounakbanik/the-movies-dataset) on Kaggle. This dataset consists of more files on the content information about the movies such as cast and crew, but I will focus on the following files for this recommender:
 
@@ -25,9 +13,26 @@ The dataset was found at [The Movies Dataset](https://www.kaggle.com/datasets/ro
 
 [ratings.csv](https://www.kaggle.com/datasets/rounakbanik/the-movies-dataset?select=ratings.csv): The full 26 million ratings from 270,000 users for all 45,000 movies.
 
+The ratings.csv file is too large for GitHub, so the data will have to be accessed from Kaggle.
+
 ## Assumptions/Hypotheses about data and model
 
 Because ratings are user inputted, there are biases involved in the data. There are certain groups of people who may leave ratings on movies: critics and people who feel very strongly about the movie (both positively and negatively). For the purposes of this project, I will assume that the ratings are representative of the general population.
+
+
+```python
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from surprise import Reader, Dataset, SVD, accuracy
+from surprise.model_selection import cross_validate
+from ast import literal_eval
+from zipfile import ZipFile
+import os
+import random
+import matplotlib as mpl
+mpl.rcParams['figure.dpi'] = 300
+```
 
 
 ```python
@@ -45,22 +50,13 @@ ratings_small = pd.read_csv(f'{SOURCE_PATH}/ratings_small.csv') # Used for testi
 ratings = pd.read_csv(f'{SOURCE_PATH}/ratings.csv')
 ```
 
-I will be taking a subset of the full ratings dataset. This will be done by taking a random sample without replacement of size 100,000 from all of the unique user ids and getting their ratings. The reason I did not just randomly split the entire ratings dataset is because I want every user represented in the dataset to have their full ratings. That is more useful to the model to know 
-
 
 ```python
-random.seed(123)
-ids = random.sample(list(set(ratings['userId'])), 10000)
-ratings_medium = ratings[ratings['userId'].isin(ids)] 
-len(ratings_medium)
+# random.seed(123)
+# ids = random.sample(list(set(ratings['userId'])), 1000)
+# ratings_medium = ratings[ratings['userId'].isin(ids)] 
+# len(ratings_medium)
 ```
-
-
-
-
-    954874
-
-
 
 ### Data Cleaning
 
@@ -314,7 +310,7 @@ plt.title("Popular Movies")
 
 
     
-![png](output_13_1.png)
+![png](output_12_1.png)
     
 
 
@@ -352,7 +348,7 @@ plt.show()
 
 
     
-![png](output_15_0.png)
+![png](output_14_0.png)
     
 
 
@@ -593,7 +589,7 @@ plt.title("High Scoring Movies")
 
 
     
-![png](output_18_1.png)
+![png](output_17_1.png)
     
 
 
@@ -609,26 +605,60 @@ plt.show()
 
 
     
-![png](output_19_0.png)
+![png](output_18_0.png)
     
 
 
 ## Feature Engineering & Transformations
 
-## Proposed Approaches (Model) with checks for overfitting/underfitting
-
-Collaborative Filtering
+There are no transformations needed for the model I will use for this project. All I have to do is convert the ratings data into a readable format for the model I will use which I will explain in the next section. The `Reader` and `Dataset.load_from_df` comes from the `surprise` package where the data is converted to a list of tuples.
 
 
 ```python
 reader = Reader()
 
-data = Dataset.load_from_df(ratings_medium[['userId', 'movieId', 'rating']], reader)
+data = Dataset.load_from_df(ratings[['userId', 'movieId', 'rating']], reader)
+data.raw_ratings[0:10]
+```
 
+
+
+
+    [(1, 110, 1.0, None),
+     (1, 147, 4.5, None),
+     (1, 858, 5.0, None),
+     (1, 1221, 5.0, None),
+     (1, 1246, 5.0, None),
+     (1, 1968, 4.0, None),
+     (1, 2762, 4.5, None),
+     (1, 2918, 5.0, None),
+     (1, 2959, 4.0, None),
+     (1, 4226, 4.0, None)]
+
+
+
+## Proposed Approaches (Model)
+
+### Single Value Decomposition
+
+In a previous homework assignment, we used Collabrative Filtering (CF) to build a recommendations system. However, CF has a couple issues. The primary challenge at hand is scalability, where the computational demands increase as the number of users and movies grows. Furthermore, sparsity poses another issue. In certain scenarios, there could be millions of users, and the similarity between two seemingly dissimilar movies might be remarkably high due to the presence of a single user who ranked them both similarly.
+
+One approach to address the scalability and sparsity challenges posed by CF is to utilize a latent factor model to capture the similarity between users and items. The aim is to transform the recommendation problem into an optimization problem, specifically focusing on accurately predicting movie ratings for a given user.
+
+Latent factors encompasses the inherent properties or concepts associated with users or movies. For this project, the latent factor represents the rating the users gave the movies. Through Singular Value Decomposition (SVD), we reduce the dimensionality of the utility matrix by extracting its latent factors. This process involves mapping each user and movie onto a latent space with a dimension of 'r'. Consequently, it facilitates a more meaningful understanding of the relationship between users and movies, making them directly comparable.
+
+This SVD model was built using the [Surprise package](https://surpriselib.com/).
+
+Hug, N., (2020). Surprise: A Python library for recommender systems. Journal of Open Source Software, 5(52), 2174, https://doi.org/10.21105/joss.02174
+
+
+```python
 svd = SVD()
 ```
 
-## Proposed Solution (Model Selection) with regularization, if needed
+## Proposed Solution (Model Selection)
+
+To train the model, I will employ a cross validation of 5 folds, using RMSE and MAE as accuracy metrics.
 
 
 ```python
@@ -638,41 +668,85 @@ start = time.time()
 cross_validate(svd, data, measures=['RMSE', 'MAE'], cv=5, verbose=True)
 
 end = time.time()
-print(f"\nTime elasped: {round(end-start, 3)} seconds ({round(len(ratings_medium)/(end-start), 3)} ratings per second)", )
+print(f"\nTime elasped: {round(end-start, 3)} seconds ({round(len(ratings)/(end-start), 3)} ratings per second)")
+
+trainset = data.build_full_trainset()
+testset = trainset.build_testset()
+
+predictions = svd.test(testset)
+
+rmse = accuracy.rmse(predictions, verbose=False) 
+mse = accuracy.mse(predictions, verbose=False) 
+mae = accuracy.mae(predictions, verbose=False) 
+
+svd.fit(trainset)
 ```
 
     Evaluating RMSE, MAE of algorithm SVD on 5 split(s).
     
                       Fold 1  Fold 2  Fold 3  Fold 4  Fold 5  Mean    Std     
-    RMSE (testset)    0.8608  0.8581  0.8581  0.8567  0.8565  0.8580  0.0015  
-    MAE (testset)     0.6558  0.6540  0.6542  0.6527  0.6527  0.6539  0.0012  
-    Fit time          4.19    4.77    4.28    4.23    4.55    4.41    0.22    
-    Test time         0.65    0.69    0.70    0.66    0.68    0.68    0.02    
+    RMSE (testset)    0.7958  0.7959  0.7964  0.7967  0.7962  0.7962  0.0004  
+    MAE (testset)     0.6018  0.6021  0.6023  0.6026  0.6022  0.6022  0.0003  
+    Fit time          185.94  385.93  365.98  394.30  344.17  335.26  76.65   
+    Test time         152.14  121.58  140.40  127.49  118.78  132.08  12.49   
     
-    Time elasped: 29.612 seconds (32245.69 ratings per second)
+    Time elasped: 3240.326 seconds (8031.38 ratings per second)
 
+
+
+
+
+    <surprise.prediction_algorithms.matrix_factorization.SVD at 0x14addb340>
+
+
+
+Now that I have a model that will predict what a user will rate a specific movie, I will now create a list of recommended movies for a given user based on what the SVD predict will be their highest rated movies. 
+
+I do this by going through every movie in the database, and getting the predicted rating for that user/movie pairing. Once I have done that for every movie, I will sort the ratings so that the highest predicted rated movie is recommended to the user. Note that all movies the user has already rated have been excluded from the list. I will demonstrate the recommender in the next section.
+
+
+```python
+def get_recommendations_for_user(user_id):
+    est_ratings = []
+    for i, row in filtered_movies.iterrows():
+        movie_id = int(row['id'])
+        title = row['title']
+        est_rat = svd.predict(user_id, movie_id).est
+        est_ratings += [[movie_id, row['title'], est_rat, row['genres']]]
+
+    recommendation = pd.DataFrame(est_ratings, columns=["movieId", "title", "estimated_rating", 'genres'])
+    recommendation = recommendation[~recommendation['movieId'].isin(ratings[ratings['userId'] == user_id]['movieId'])]
+    
+    return recommendation.sort_values(by='estimated_rating', ascending=False)
+```
 
 ## Results (Accuracy) and Learnings from the methodology
 
+I will evaluate the accuracy of the model on the test set using RMSE, MSE, MAE. The model predicts what the user will rate a movie, so I can calculate how accurate the SVD model is on movies that have already been rated. 
+
 
 ```python
-trainset = data.build_full_trainset()
-
-svd.fit(trainset)
+print("RMSE:", round(rmse, 4))
+print("MSE:", round(mse, 4))
+print("MAE:", round(mae, 4))
 ```
 
+    RMSE: 0.7031
+    MSE: 0.4943
+    MAE: 0.5338
 
 
+The accuracy metrics are quite low for this type of model, so I believe it is sucessfully predicting user ratings. There is always room for improvement, though.
 
-    <surprise.prediction_algorithms.matrix_factorization.SVD at 0x1088535e0>
+### Example user recommendation
 
-
+I've chosen User 1 to demonstrate the recommender. Below is what they have rated the movies they have watched, sorted by rating.
 
 
 ```python
-user_id = ids[100]
+user_id = 1
 
-user_hist = ratings_medium[ratings_medium['userId'] == user_id].merge(movies_md[['id', 'title', 'genres']], left_on='movieId', right_on="id")
+user_hist = ratings[ratings['userId'] == user_id].merge(movies_md[['id', 'title', 'genres']], left_on='movieId', right_on="id")
 user_hist = user_hist.sort_values(by='rating', ascending=False)
 user_hist
 ```
@@ -709,204 +783,114 @@ user_hist
   </thead>
   <tbody>
     <tr>
-      <th>0</th>
-      <td>227122</td>
-      <td>345</td>
+      <th>2</th>
+      <td>1</td>
+      <td>858</td>
       <td>5.0</td>
-      <td>1246787949</td>
-      <td>345</td>
-      <td>Eyes Wide Shut</td>
-      <td>[Mystery, Drama]</td>
-    </tr>
-    <tr>
-      <th>5</th>
-      <td>227122</td>
-      <td>924</td>
-      <td>5.0</td>
-      <td>1246787779</td>
-      <td>924</td>
-      <td>Dawn of the Dead</td>
-      <td>[Fantasy, Horror, Action]</td>
-    </tr>
-    <tr>
-      <th>15</th>
-      <td>227122</td>
-      <td>44555</td>
-      <td>5.0</td>
-      <td>1246788227</td>
-      <td>44555</td>
-      <td>A Woman, a Gun and a Noodle Shop</td>
-      <td>[Comedy, Drama, Thriller]</td>
-    </tr>
-    <tr>
-      <th>12</th>
-      <td>227122</td>
-      <td>8973</td>
-      <td>5.0</td>
-      <td>1246789196</td>
-      <td>8973</td>
-      <td>Lord of Illusions</td>
-      <td>[Mystery, Horror, Thriller]</td>
-    </tr>
-    <tr>
-      <th>10</th>
-      <td>227122</td>
-      <td>3083</td>
-      <td>5.0</td>
-      <td>1246788054</td>
-      <td>3083</td>
-      <td>Mr. Smith Goes to Washington</td>
-      <td>[Comedy, Drama]</td>
-    </tr>
-    <tr>
-      <th>13</th>
-      <td>227122</td>
-      <td>39183</td>
-      <td>4.5</td>
-      <td>1246788609</td>
-      <td>39183</td>
-      <td>Once in a Lifetime: The Extraordinary Story of...</td>
-      <td>[Documentary]</td>
-    </tr>
-    <tr>
-      <th>14</th>
-      <td>227122</td>
-      <td>43376</td>
-      <td>4.5</td>
-      <td>1246788264</td>
-      <td>43376</td>
-      <td>Diary of a Country Priest</td>
-      <td>[Drama]</td>
-    </tr>
-    <tr>
-      <th>6</th>
-      <td>227122</td>
-      <td>1103</td>
-      <td>4.0</td>
-      <td>1246787622</td>
-      <td>1103</td>
-      <td>Escape from New York</td>
-      <td>[Science Fiction, Action]</td>
-    </tr>
-    <tr>
-      <th>11</th>
-      <td>227122</td>
-      <td>4967</td>
-      <td>4.0</td>
-      <td>1246788380</td>
-      <td>4967</td>
-      <td>Keeping the Faith</td>
-      <td>[Comedy]</td>
+      <td>1425941523</td>
+      <td>858</td>
+      <td>Sleepless in Seattle</td>
+      <td>[Comedy, Drama, Romance]</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>227122</td>
-      <td>922</td>
-      <td>4.0</td>
-      <td>1246787620</td>
-      <td>922</td>
-      <td>Dead Man</td>
-      <td>[Drama, Fantasy, Western]</td>
+      <td>1</td>
+      <td>1246</td>
+      <td>5.0</td>
+      <td>1425941556</td>
+      <td>1246</td>
+      <td>Rocky Balboa</td>
+      <td>[Drama]</td>
     </tr>
     <tr>
-      <th>16</th>
-      <td>227122</td>
-      <td>44694</td>
-      <td>4.0</td>
-      <td>1246788599</td>
-      <td>44694</td>
-      <td>Big Time</td>
-      <td>[Documentary, Drama, Music, Romance]</td>
-    </tr>
-    <tr>
-      <th>8</th>
-      <td>227122</td>
-      <td>2186</td>
-      <td>3.5</td>
-      <td>1246788239</td>
-      <td>2186</td>
-      <td>Within the Woods</td>
-      <td>[Horror]</td>
-    </tr>
-    <tr>
-      <th>9</th>
-      <td>227122</td>
-      <td>2300</td>
-      <td>3.5</td>
-      <td>1246787600</td>
-      <td>2300</td>
-      <td>Space Jam</td>
-      <td>[Animation, Comedy, Drama, Family, Fantasy]</td>
+      <th>10</th>
+      <td>1</td>
+      <td>96821</td>
+      <td>5.0</td>
+      <td>1425941382</td>
+      <td>96821</td>
+      <td>Caesar Must Die</td>
+      <td>[Drama, Documentary]</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>227122</td>
-      <td>508</td>
-      <td>3.5</td>
-      <td>1246788638</td>
-      <td>508</td>
-      <td>Love Actually</td>
-      <td>[Comedy, Romance, Drama]</td>
+      <td>1</td>
+      <td>147</td>
+      <td>4.5</td>
+      <td>1425942435</td>
+      <td>147</td>
+      <td>The 400 Blows</td>
+      <td>[Drama]</td>
     </tr>
     <tr>
-      <th>17</th>
-      <td>227122</td>
-      <td>54796</td>
-      <td>3.5</td>
-      <td>1246787769</td>
-      <td>54796</td>
-      <td>Thicker than Water</td>
-      <td>[TV Movie, Drama]</td>
-    </tr>
-    <tr>
-      <th>19</th>
-      <td>227122</td>
-      <td>63876</td>
-      <td>3.5</td>
-      <td>1246788625</td>
-      <td>63876</td>
-      <td>Circle of Love</td>
-      <td>[Drama, Comedy, History, Romance]</td>
-    </tr>
-    <tr>
-      <th>7</th>
-      <td>227122</td>
-      <td>1729</td>
-      <td>2.5</td>
-      <td>1246788621</td>
-      <td>1729</td>
-      <td>The Forbidden Kingdom</td>
-      <td>[Action, Adventure, Fantasy]</td>
+      <th>5</th>
+      <td>1</td>
+      <td>2762</td>
+      <td>4.5</td>
+      <td>1425941300</td>
+      <td>2762</td>
+      <td>Young and Innocent</td>
+      <td>[Drama, Crime]</td>
     </tr>
     <tr>
       <th>4</th>
-      <td>227122</td>
-      <td>923</td>
-      <td>2.0</td>
-      <td>1246788268</td>
-      <td>923</td>
-      <td>Dawn of the Dead</td>
-      <td>[Horror]</td>
+      <td>1</td>
+      <td>1968</td>
+      <td>4.0</td>
+      <td>1425942148</td>
+      <td>1968</td>
+      <td>Fools Rush In</td>
+      <td>[Drama, Comedy, Romance]</td>
     </tr>
     <tr>
-      <th>2</th>
-      <td>227122</td>
-      <td>750</td>
-      <td>2.0</td>
-      <td>1290984227</td>
-      <td>750</td>
-      <td>Murder She Said</td>
-      <td>[Drama, Crime, Mystery, Comedy]</td>
+      <th>6</th>
+      <td>1</td>
+      <td>2959</td>
+      <td>4.0</td>
+      <td>1425941601</td>
+      <td>2959</td>
+      <td>License to Wed</td>
+      <td>[Comedy]</td>
     </tr>
     <tr>
-      <th>18</th>
-      <td>227122</td>
+      <th>7</th>
+      <td>1</td>
+      <td>4226</td>
+      <td>4.0</td>
+      <td>1425942228</td>
+      <td>4226</td>
+      <td>Shriek If You Know What I Did Last Friday the ...</td>
+      <td>[Comedy]</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>1</td>
       <td>58559</td>
-      <td>2.0</td>
-      <td>1246787578</td>
+      <td>4.0</td>
+      <td>1425942007</td>
       <td>58559</td>
       <td>Confession of a Child of the Century</td>
       <td>[Drama]</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>1</td>
+      <td>54503</td>
+      <td>3.5</td>
+      <td>1425941313</td>
+      <td>54503</td>
+      <td>The Mystery of Chess Boxing</td>
+      <td>[Action, Foreign]</td>
+    </tr>
+    <tr>
+      <th>0</th>
+      <td>1</td>
+      <td>110</td>
+      <td>1.0</td>
+      <td>1425941529</td>
+      <td>110</td>
+      <td>Three Colors: Red</td>
+      <td>[Drama, Mystery, Romance]</td>
     </tr>
   </tbody>
 </table>
@@ -914,40 +898,11 @@ user_hist
 
 
 
-
-```python
-if len(user_hist) < 10:
-    user_genre_count = count_genres(user_hist['genres'])
-else:
-    user_genre_count = count_genres(user_hist.head(10)['genres'])
-
-plt.pie(user_genre_count.values(), labels=user_genre_count.keys(), autopct='%1.1f%%')
-plt.axis('equal')
-plt.show()
-```
-
-
-    
-![png](output_28_0.png)
-    
-
+Now, I will use my recommender to recommend 10 movies to the user using the method described above.
 
 
 ```python
-def get_recommendations_for_user(user_id):
-    est_ratings = []
-    for i, row in filtered_movies.iterrows():
-        movie_id = int(row['id'])
-        title = row['title']
-        est_rat = svd.predict(user_id, movie_id).est
-        est_ratings += [[movie_id, row['title'], est_rat, row['genres']]]
-
-    recommendation = pd.DataFrame(est_ratings, columns=["movieId", "title", "estimated_rating", 'genres'])
-    recommendation = recommendation[~recommendation['movieId'].isin(ratings[ratings['userId'] == user_id]['movieId'])]
-    return recommendation.sort_values(by='estimated_rating', ascending=False)
-
 user_rec = get_recommendations_for_user(user_id).head(10)
-
 user_rec
 ```
 
@@ -980,74 +935,74 @@ user_rec
   </thead>
   <tbody>
     <tr>
-      <th>105</th>
-      <td>905</td>
-      <td>Pandora's Box</td>
-      <td>4.393716</td>
-      <td>[Drama, Thriller, Romance]</td>
+      <th>71</th>
+      <td>306</td>
+      <td>Beverly Hills Cop III</td>
+      <td>5.000000</td>
+      <td>[Action, Comedy, Crime]</td>
     </tr>
     <tr>
-      <th>46</th>
-      <td>953</td>
-      <td>Madagascar</td>
-      <td>4.338538</td>
-      <td>[Family, Animation]</td>
+      <th>36</th>
+      <td>44555</td>
+      <td>A Woman, a Gun and a Noodle Shop</td>
+      <td>4.904216</td>
+      <td>[Comedy, Drama, Thriller]</td>
+    </tr>
+    <tr>
+      <th>101</th>
+      <td>307</td>
+      <td>Rome, Open City</td>
+      <td>4.895459</td>
+      <td>[Drama, History]</td>
+    </tr>
+    <tr>
+      <th>212</th>
+      <td>28</td>
+      <td>Apocalypse Now</td>
+      <td>4.848280</td>
+      <td>[Drama, War]</td>
+    </tr>
+    <tr>
+      <th>53</th>
+      <td>17</td>
+      <td>The Dark</td>
+      <td>4.840669</td>
+      <td>[Horror, Thriller, Mystery]</td>
+    </tr>
+    <tr>
+      <th>67</th>
+      <td>246</td>
+      <td>Zatoichi</td>
+      <td>4.793591</td>
+      <td>[Adventure, Drama, Action]</td>
+    </tr>
+    <tr>
+      <th>161</th>
+      <td>2064</td>
+      <td>While You Were Sleeping</td>
+      <td>4.784361</td>
+      <td>[Comedy, Drama, Romance]</td>
     </tr>
     <tr>
       <th>47</th>
       <td>5971</td>
       <td>We're No Angels</td>
-      <td>4.243593</td>
+      <td>4.777725</td>
       <td>[Comedy, Crime, Drama]</td>
     </tr>
     <tr>
-      <th>30</th>
-      <td>913</td>
-      <td>The Thomas Crown Affair</td>
-      <td>4.227379</td>
-      <td>[Drama, Crime, Romance]</td>
+      <th>18</th>
+      <td>2019</td>
+      <td>Hard Target</td>
+      <td>4.757174</td>
+      <td>[Action, Adventure, Crime, Thriller]</td>
     </tr>
     <tr>
-      <th>215</th>
-      <td>534</td>
-      <td>Terminator Salvation</td>
-      <td>4.169603</td>
-      <td>[Action, Science Fiction, Thriller]</td>
-    </tr>
-    <tr>
-      <th>109</th>
-      <td>928</td>
-      <td>Gremlins 2: The New Batch</td>
-      <td>4.135304</td>
-      <td>[Comedy, Horror, Fantasy]</td>
-    </tr>
-    <tr>
-      <th>26</th>
-      <td>2762</td>
-      <td>Young and Innocent</td>
-      <td>4.079673</td>
-      <td>[Drama, Crime]</td>
-    </tr>
-    <tr>
-      <th>278</th>
-      <td>3060</td>
-      <td>The Big Parade</td>
-      <td>4.070152</td>
-      <td>[Drama, Romance, War]</td>
-    </tr>
-    <tr>
-      <th>188</th>
-      <td>290</td>
-      <td>Barton Fink</td>
-      <td>4.062039</td>
-      <td>[Comedy, Drama]</td>
-    </tr>
-    <tr>
-      <th>111</th>
-      <td>909</td>
-      <td>Meet Me in St. Louis</td>
-      <td>4.051369</td>
-      <td>[Comedy, Music, Romance]</td>
+      <th>146</th>
+      <td>3089</td>
+      <td>Red River</td>
+      <td>4.756867</td>
+      <td>[Western]</td>
     </tr>
   </tbody>
 </table>
@@ -1055,18 +1010,39 @@ user_rec
 
 
 
+The highest estimated rating was 5 for Bevery Hills Cop III for User 1. Comparing the genre breakdown of User 1's actual ratings versus the recommended movies makes sense. The user liked dramas and comedies the most, which is reflected in the recommended movies.
+
 
 ```python
+if len(user_hist) < 10:
+    user_genre_count = count_genres(user_hist['genres'])
+else:
+    user_genre_count = count_genres(user_hist.head(10)['genres'])
+
+plt.subplot(1, 2, 1)
+plt.pie(user_genre_count.values(), labels=user_genre_count.keys(), autopct='%1.1f%%')
+plt.title(f"Genres of the Top 10 Highest Rated Movies for User {user_hist.iloc[0,0]}")
+plt.axis('equal')
+plt.show()
+
 rec_genre_count = count_genres(user_rec['genres'])
 
+plt.subplot(1, 2, 2)
 plt.pie(rec_genre_count.values(), labels=rec_genre_count.keys(), autopct='%1.1f%%')
+plt.title(f"Genres of the Top 10 Recommended Movies for User {user_hist.iloc[0,0]}")
 plt.axis('equal')
 plt.show()
 ```
 
 
     
-![png](output_30_0.png)
+![png](output_34_0.png)
+    
+
+
+
+    
+![png](output_34_1.png)
     
 
 
@@ -1075,6 +1051,8 @@ plt.show()
 There was a good portion of the data from kaggle I did not use, mainly information about the movies such as cast, crew, keywords from the description, and genre. Next steps would be to make a hybrid recommender that incorporates the svd model already made with some of the movie information. For example, based on the movies the user gave a high rating for, find movies that other users also liked (SVD). Then, find movies that have similar plots, cast, or genre to the movies the user already liked.
 
 I think incorporating these multiple aspects could make an even more accurate recommender.
+
+Another note is that the highest recommended movie for User 1 was Beverly Hills Cop III, which is a sequel. User 1 has not seen the original movies, so it does not make sense to recommend that movie. An adjustment to the recommender should be made to filter out sequels if the user has not seen the movies before it.
 
 
 ```python
